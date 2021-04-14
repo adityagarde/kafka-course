@@ -1,0 +1,235 @@
+Kafka
+
+Kafka allows you to decouple your data streams and systems.
+Distributed, resilient architecture and fault tolerant.
+Horizontal Scalability - Can scale to millions of messages per second.
+High performance - Latency less than 10 ms - real time.
+
+Use cases - Messaging Systems, Activity tracking, Gather metrics from many different locations.
+		  - Application logs gathering, Stream processing, De-coupling of system dependencies.
+
+Kafka is only used as a transportation mechanism.
+
+Chapter - 1 KAFKA THEORY
+
+1. Topics, partitions and offsets
+	
+	Topic - a particular stream of data - Similar to a table in a database.
+		  - a Topic is identified by its name.
+
+	Topics are split in partitions.
+	- Paritions are definite, and ordered and numbered from 0 onwards.
+	- Each message within a partition gets on incremental id, called offset.
+
+	- Offset only have a meaning for a specific partition. Eg - offset 9 in partition 4.
+	- Order is guranteed only within a partition.
+	- Data is kept only for a limited time - 1 week by default.
+	- Once a data is writtem to a partition - it can't be changed - immutability.
+	- Data is assigned tandomly to a partition unless a key is provided.
+
+2. Brokers and Topics
+
+	Brokers - A kafka cluster is composed of multiple brokers (servers).
+			- Each broker is identified with its ID (integer).
+			- Each broker contains certain topic partitions.
+			- After connecting to any broker (bootstrap broker) - you will be connected to the entire cluster.
+		- Data is distributed accross Brokers.
+
+3. Topic replication factor	
+	
+	- Because Kafka is a distributed system, we need to have replication - in case some system goes down - others should be available.
+	- Topics should have a replication factor > 1 - usually between 2 and 3.
+	- Replication factor of 2 means each topic is replicated by storing twice in 2 different brokers.
+
+	Leader - At any time only ONE broker can be a leader for a given partition.
+		   - Only that leader can receive and serve data for a partition.
+		   - Other brokers will just be passive replicas and will sync data from the leader = ISR (In-Sync replica)
+
+4. Producers and message keys
+
+	- Producers write data to topics.
+	- Producers automatically know to which broker and partition to write to.
+	- Producer does the work of load balancing - sending data to topics / partitions - in a round robin way by default.
+	- Producer can choose to receive acknowledgement of data writes.
+		- acks = 0 : Producer sends data but does not wait for acknowledgement - possible data loss.
+		- acks = 1 : Default - Producer will wait for leader acknowledgement - limited data los.
+		- acks = all : Lesder + replicas have to acknowledge the message - no data loss.
+
+	Message Keys - Producer can choose to send a key with the message.
+				 - If key = null- data is sent in round robin manner.
+				 - If key is sent - then all messages for that key will always go to the same partition.
+				 - Key is used for message ordering for a specific field.
+
+5. Consumers and Consumer groups
+
+	- Consumer read data from a topic (identified by name).
+	- Consumer know which broker to read from and how to handle broker failures.
+	- Data is read in order WITHIN each partition.
+	- Consumer can read parallely from more than one partitions.
+
+	Consumer groups - Group of one or more consumers.
+					- Each consumer within a group reads from an exculsive set of paritions.
+
+6. Consumer Offsets
+
+	- Kafka stores offsets at which a consumer group has been reading.
+	- The offsets commited live in a Kaka topic named __consumer_offsets.
+
+	- When a customer in a group has procssed data received from Kafa, it should be committing the offsets.
+	- If a consumer dies, it will be able to read back from where it left off because of the committed consumer offsets.
+
+	Deivery Semantics for consumers - 
+		- Consumer choose when to commit offsets.
+		- There are 3 delivery semantics.
+			- At most once - Offsets are committed as soon as the message is received.
+						   - If the processing goes wrong, the message will be lost - wont be read again.
+						   - Thus not preffered.
+			- At least once - Offsets are committed after the message is processed.
+							- If the processing goes wrong, the message will be read again.
+							- This is preffered way.
+							- This can result in duplicate processing of messages. Make sure your processing is idempotent.
+								- i.e. Processing the message again won't impact the system.
+			- Exactly once - Can be achieved for Kafka to Kafka workflows using Kafka Streams API.
+						   - For Kafka to External System like a DB - use an idempotent consumer.
+
+7. Kafka Broker Discovery
+
+	- Every Kafka broker is also called a bootstrap broker
+	- This means that you need to connect to one broker only and you will be connected to the entire cluster.
+	- Internal Flow - 
+			1. Client sends connection + meta dat request to one broker in the cluster.
+			2. The broker returns list of all brokers.
+			3. The client can now connect to any needed broker.
+
+8. Zookeeper
+	
+	- Zookeeper manages brokers - keeps a list of them - manages the Kafka Cluster.
+	- Zookeeper helps in performing leader election of partitions.
+	- Zookeeper sends notifications to Kafka in case of changes - eg when new topic / broker dies / broker comes up etc.
+	- Zookeeper by design operates with odd number of servers - 3 - 5 - 7.
+	- Zookeeper has a leader which handle writes and the rest of the servers are followers which handle reads.
+
+- Messages are appended to a topic-partition in the order they are sent.
+- Consumers read messages in the order stored in a topic-partition.
+- With a replication factor of N - producers and conusmers can tolerate up to N-1 brokers being down.
+- As long as the number of partitions remains constant for a topic - no new partitions - the same key will always go to the same partition.
+
+
+
+In config/zookeeper.properties - dataDir is having a temporary directory, so we change it to a permanent one.
+changed dataDir to /Users/adityagarde/kafka_2.13-2.7.0/data/zookeeper
+
+In config/server.properties - change logsDit to a permanent location.
+log.dirs=/Users/adityagarde/kafka_2.13-2.7.0/data/kafka
+
+1. zookeeper-server-start config/zookeepar.properties
+	This should give INFO binding to port 0.0.0.0/0.0.0.0:2181 on success.
+
+2. kafka-server-start config/server.properties
+	This should give INFO [KafkaServer id=0] started (kafka.server.KafkaServer)
+
+
+CHAPTER 3 KAFKA CLI 101
+
+1. kafka-topics CLI
+
+	kafka-topics --zookeeper 127.0.0.1:2181 --topic first_topic --create
+	=> Error - Missing required argument "[partitions]"
+
+	kafka-topics --zookeeper 127.0.0.1:2181 --topic first_topic --create --partitions 3
+	=> Error - Missing required argument "[replication-factor]"
+
+	kafka-topics --zookeeper 127.0.0.1:2181 --topic first_topic --create --partitions 3 --replication-factor 2
+	=> Error - Error while executing topic command : Replication factor: 2 larger than available brokers: 1.
+		- We cannot create a topic with a replication factor greater than the number of brokers we have.
+
+	kafka-topics --zookeeper 127.0.0.1:2181 --topic first_topic --create --partitions 3 --replication-factor 1
+
+	Listing topics - 
+		kafka-topics --zookeeper 127.0.0.1:2181 --list
+
+	Describing topics -
+		kafka-topics --zookeeper 127.0.0.1:2181 --topic first_topic --describe
+
+	kafka-topics --zookeeper 127.0.0.1:2181 --topic second_topic --create --partitions 6 --replication-factor 1
+
+	Deleting topics -
+		kafka-topics --zookeeper 127.0.0.1:2181 --topic second_topic --delete
+		O/P - Topic second_topic is marked for deletion.
+			  Note: This will have no impact if delete.topic.enable is not set to true.
+
+2. Kafka Console Producer CLI - kafka-console-producer
+
+	kafka-console-producer --broker-list 127.0.0.1:9092 --topic first_topic
+	=> This will give just one ">" prompt and we can send our messages after this.
+
+	kafka-console-producer --broker-list 127.0.0.1:9092 --topic first_topic --producer-property acks=all
+	=> by adding --producer-property we can add newer properties.
+
+	kafka-console-producer --broker-list 127.0.0.1:9092 --topic new_topic
+	=> new_topic was not there earlier, but now it is created with default PartitionCount: 1	ReplicationFactor: 1.
+
+	We can change the default value for number of partitions by editing the num.partitions field under Log Basics in config/server.properties.
+
+3. Kafka Console consumer CLI - kafka-console-consumer
+
+	kafka-console-consumer --bootstrap-server 127.0.0.1:9092 --topic first_topic
+	=> Nothing happens here - because it only reads from the point we start it and will consume newer messages.
+
+	kafka-console-consumer --bootstrap-server 127.0.0.1:9092 --topic first_topic --from_beginning
+	=> Reading all the messages from beginning.
+
+4. Kafka Console Consumers in groups
+
+	kafka-console-consumer --bootstrap-server 127.0.0.1:9092 --topic first_topic --group my-first-group
+	=> If we open more than one instance of this consumer - we can see that the messages coming from the producer are slipt between them because they belong to the same group.
+
+	kafka-console-consumer --bootstrap-server 127.0.0.1:9092 --topic first_topic --group my-second-group --from-beginning
+	=> This shows all the messages from starting as it is a new group and after this command the offset is set to the last message.
+	=> If we repeat the message then we will not get the messages from starting.
+
+5. Kafka Consumer Groups CLI- kafka-console-groups
+
+	kafka-consumer-groups --bootstrap-server 127.0.0.1:9092 --list
+	=> Lists the consumer groups
+
+	kafka-consumer-groups --bootstrap-server localhost:9092 --describe --group my-second-group
+	=> Describes the details. We can check the LAG field which is difference of current offset and log end offset.
+
+6. Resetting Offsets
+	
+	--reset-offsets => Reset offsets of consumer group. Supports one consumer group at the time, and instances should be inactive.
+	Has 2 execution options: --dry-run (the default) to plan which offsets to reset, and --execute to update the offsets.
+
+	You must choose one of the following reset specifications: --to-datetime, --by-period, --to-earliest, --to-latest, --shift-by, --from-file, --to-current.
+
+	kafka-consumer-groups --bootstrap-server localhost:9092 --group my-first-group --reset-offsets --to-earliest
+	=> WARN: No action will be performed as the --execute option is missing.
+
+	kafka-consumer-groups --bootstrap-server localhost:9092 --group my-first-group --reset-offsets --to-earliest --execute
+	=> Error - One of the reset scopes should be defined: --all-topics, --topic.
+
+	kafka-consumer-groups --bootstrap-server localhost:9092 --group my-first-group --reset-offsets --to-earliest --execute --topic first_topic
+	=> This successfully executes resulting in '0' as new offset for all the paritions of the topic we used.
+
+	kafka-consumer-groups --bootstrap-server localhost:9092 --describe --group my-first-group
+	=> When this command is executed now, we can see that offset has ben set to 0.
+
+	kafka-consumer-groups --bootstrap-server localhost:9092 --group my-first-group --reset-offsets --shift-by 2 --execute --topic first_topic
+	=> --shift-by 2 -> Will shift it 2 forward
+	=> --shift-by -2 -> Will shift it 2 backward
+
+
+
+
+
+
+
+
+
+
+the wakeup() method is used to interupt consumer.poll()
+It will throw WakeUpException
+latch.countDown(); - to tell the main code that we are done with the consumer.
+
+Assign and Seek are mostlyused to replay data or fetch specific message.
