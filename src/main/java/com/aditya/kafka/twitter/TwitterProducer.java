@@ -1,5 +1,9 @@
 package com.aditya.kafka.twitter;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
@@ -84,12 +88,14 @@ public class TwitterProducer {
 		logger.info("End Of Application");
 	}
 
-	String consumerKey = "wz2iWW0cX8OYCiu6h7sYKp49g";
-	String consumerSecret = "qPyaJbekoyxUg2TNJ0l1Ren5au9vDy7eYJ2rrLDnsezbxX05uV";
-	String token = "1382380949367779332-8mkyauerkDReVZrASuo5T4elhHylMG";
-	String secret = "QIO6bmd7161JfLZRdh0Ip1cq3QmBkUor4CdQ0oMeBbCXs";
+	Properties props = fetchTwitterKeys();
 
-	List<String> terms = Lists.newArrayList("docker");
+	String consumerKey = props.getProperty("consumerKey");
+	String consumerSecret = props.getProperty("consumerSecret");
+	String token = props.getProperty("token");
+	String secret = props.getProperty("secret");
+
+	List<String> terms = Lists.newArrayList("docker", "kafka", "kubernetes");
 
 	public Client createTwitterClient(BlockingQueue<String> msgQueue) {
 
@@ -121,15 +127,44 @@ public class TwitterProducer {
 		properties.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
 		properties.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
 
+		// creating Safe Producer
 		properties.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
-		//properties.setProperty(ProducerConfig.ACKS_CONFIG, "all");
+		// properties.setProperty(ProducerConfig.ACKS_CONFIG, "all");
 		properties.setProperty(ProducerConfig.RETRIES_CONFIG, Integer.toString(Integer.MAX_VALUE));
 		properties.setProperty(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, "5");
+
+		// high throughput producer (compression and batching)
+		properties.setProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG, "snappy");
+		properties.setProperty(ProducerConfig.LINGER_MS_CONFIG, "20");
+		properties.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, Integer.toString(32 * 1024));
 
 		// Create the Producer
 		KafkaProducer<String, String> producer = new KafkaProducer<String, String>(properties);
 
 		return producer;
 
+	}
+
+	public Properties fetchTwitterKeys() {
+
+		File configFile = new File("config.properties");
+		Properties props = null;
+
+		try {
+			props = new Properties();
+			FileReader reader = new FileReader(configFile);
+			props.load(reader);
+
+			reader.close();
+
+		} catch (FileNotFoundException ex) {
+			logger.info("config.properties not found.");
+			ex.printStackTrace();
+		} catch (IOException ex) {
+			logger.info("Throwing generic IOException.");
+			ex.printStackTrace();
+		}
+
+		return props;
 	}
 }
