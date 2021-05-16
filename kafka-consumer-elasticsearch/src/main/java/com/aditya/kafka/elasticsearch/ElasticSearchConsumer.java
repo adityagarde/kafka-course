@@ -75,7 +75,7 @@ public class ElasticSearchConsumer {
 				String id = extractStringId(record.value());
 
 				// Inserting data in ElasticSearch
-				IndexRequest indexRequest = new IndexRequest("twitter").type("tweets").id(id).source(record.value(),
+				IndexRequest indexRequest = new IndexRequest("twitter").id(id).source(record.value(),
 						XContentType.JSON);
 
 				IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
