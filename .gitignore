@@ -7,6 +7,8 @@
 META-INF
 
 *.jar
+/kafka-course/kafka-connect/connectors/*
+!/kafka-course/kafka-connect/connectors/kafka-connect-twitter/
 *.war
 *.nar
 *.ear
