@@ -1,0 +1,90 @@
+ADVANCED CONSUMER CONFIGURATIONS
+
+1. Delivery Semantics
+	
+	- At most once
+		- Offsets are committed as soon as the message batch is received.
+		- If the processing goes wrong the message will be lost.
+		- When the consumer starts again - it will read data from committed offset and thus there are chances of messages being lost.
+
+	- At least once
+		- Default
+		- Offsets are committed after the message is processed.
+		- If the processing goes wrong - messages will be read again.
+		- There are chances of duplicate processing of messages.
+		- We need to ensure that our processing is idempotent.
+
+	- Exactly Once
+		- Only for Kafka to Kafka workflow using Streams API.
+
+	- IDEMPOTENCE
+		- Unique Id
+
+2. Consumer Poll Behaviour
+	
+	- poll(Kafka) vs push model
+	- Consumer ---- .poll(Duration timeout) -----> Broker
+		- This will return data immediately if available, if not will wait till timeout and return empty.
+
+	- fetch.min.bytes
+		- default = 1
+		- Controls how much data you want to pull at least on each request.
+		- Helps in improving throughput (by decreasing request numbers) at the cost of latency.
+
+	- max.poll.records
+		- default = 500
+		- controls how many records to receive per poll request.
+		- Increase if your messages are very small and have lot of available RAM.
+
+	- max.partitions.fetch.bytes
+		- default = 1 MB
+		- maximum data returned by the broker per partition.
+
+	- fetch.max.bytes
+		- default = 50 MB
+		- Maximum data returned for each fetch request (covers multiple partitions).
+		- The consumer performs multiple fetches in parallel.
+
+3. Consumer Offset Commits Stratergies
+
+	- enable.auto.commit = true & synchrous processing of batches
+		- Offsets will be auto-committed at regular interval every time .poll() is called.
+		- auto.commit.interval.ms = 5000 by default
+		- If Synchrous processing is not used, we land up in "at-most-once" behaviour because offsets will be committed before data is processed.
+
+	- enable.auto.commit = false & manual commit of offsets (better)
+
+4. Consumer Offset Reset Behaviour
+	
+	- Kafka has a retension of 7 days. After 7 days - the offsets are invalid.
+
+	- auto.offset.reset = latest - will read from the end of the log.
+	- auto.offset.reset = earliest - will read from the start of the log.
+	- auto.offset.reset = none - will throw exception if not offset is found.
+
+	- offset.retension.minutes - time till the consumer offsets will not be lost.
+
+	- kafka-consumer-groups --bootstrap-server 127.0.0.1 --group kafka-demo-elasticsearch --reset-offsets --execute --to-earliest --topic twitter_tweets
+	- Stop the consumer - use this to reset - Then agin start the consumer - it will consume from the starting - ElasticSearch will not duplicate data.
+
+5. Controlling Consumer Liveliness
+
+	- In a Consumer Group - All consumers Poll the Broker (Poll Thread) as well as talk with a Consumer Coordinator / Acting Broker (Heartbeat Thread).
+	- If some consumer is down - then there is re-balancing.
+	- To avoid issues - consumers are encourged to process data fast and poll often.
+
+	- Consumer Heartbeat Thread
+		- session.timeout.ms = 10 (default)
+		- heartbeats are sent periodically to the broker.
+		- If no heartbeat is sent during that period - the consumer is considered to be dead.
+
+		- heartbeat.interval.ms = 3 ms (default)
+		- how often to send heartbeats.
+		- Usually set to 1/3rd of session.timeout.ms
+
+		- heartbeat.interval.ms controls how frequently the KafkaConsumer poll() method will send a heartbeat to the group coordinator
+		- whereas session.timeout.ms controls how long a consumer can go without sending a heartbeat.
+
+	- Consumer Poll Thread
+		- max.poll.interval.ms = 5 ms (default)
+		- maximum amount of time between two .poll() calls before declaring the consumer dead.

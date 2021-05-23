@@ -1,0 +1,96 @@
+ADVANCED KAFKA PRODUCER CONFIGURATIONS
+
+1. Producer Acks - 
+
+	1. acks = 0 - No Acks
+		- No response is requested.
+		- There are chances of data loss - if broker goes offline or some exception occurs.
+		- Useful when data loss can be tolerated like Metrics collection / Log collection.
+		- Good on performance as the broker never responds to the producer.
+
+	2. acks = 1 - Leader acks
+		- Leader response is requested, but replication is not a gurantee.
+		- Replication happens in background, but is not a pre-requisite to receiving a response.
+		- If an ack is not received, the producer may retry.
+		- If the leader broker goes down but replicas haven't replicated the data yet, we have a data loss.
+
+	3. acks = all (replica acks)
+		- Leader & replicas ack requested.
+		- Added latency and safety.
+		- a. Producer sends data to leader
+		  b. Leader sends it to replica brokers
+		  c. Replicas acknowledge the write
+		  d. Leader broker sends response to producer.
+		- No data loss.
+
+		- When acks = all, we need to use min.insync.replicas.
+			- When min.insync.replicas can be set at the broker or topic level.
+			- If set at broker level it can be overriden at topic level.
+			- Min.insync.replicas = 2 => 2 brokers that are insync replicas (including the leader) must respond that they have the data.
+			- Ex. if replication.factor = 3, min.insync.replicas = 2, acks = all then we can tolerate only 1 broker going down.
+
+2. Producer retries - 
+	
+	- Handling exceptions in case of failures - otherwise data will be lost.
+	- "retries" setting - default is 0 - should be increased.
+	- In case of retries - there is a chance that messages will be sent out of order.
+	- This becomes a issue when when we are using key-based ordering.
+
+	- max.in.fight.requests.per.connection = settings for how many produce requests can be made in parallel.
+		- default value = 5
+		- can be set to 1 to ensure ordering - but this might impact throughput.
+
+3. Idempotent Producer -
+
+	- To AVOID DUPLICATION of requests.
+	- Ex. Producer produces one request and kafka commits it but the acks fails to reach back the producer. Because the retries are set to more than 0, the producer tries again and kafka also commits again and sends acks.
+		- To avoid this kafka has introduced request_id which is checked before re-commiting.
+	- This gurantees a stable and safe pipeline. Gurantees ordering and improves performance.
+	- retries = Integer.MAX_VALUE
+	  max.in.flight.requests = 5 (Kafka > 1.1)
+	  acks = all
+	- For Idempotent Producer just use - producerProps.put("enable.idempotence", true); && min.insync.replicas = 2(broker / topic level).
+
+	- There might be some impact on throughput when running a Safe Producer - but we should evaluate than can we work with it or not.
+
+4. Message Compression -
+
+	- Compressing data - JSON.
+	- Compression is enabled at the Producer level and doesnt require any configuration change in the brokers or in the consumer.
+	- compression.type = none by default - can be 'gzip', 'snappy', 'Iz4' etc.
+	- Compression especially important when bigger batch.
+	- Advantages -
+		- Decreases the request sie.
+		- Faster to transfer data over the network - less latency.
+		- Better throughput.
+		- Better disk utilisation in Kafka because of smaller size.
+
+5. Producer Batching -
+
+	- linger.ms = number of milliseconds a producer is willing to wait before sending a batch out.
+		- default = 0 => It will send without waiting.
+		- If we set linger.ms = 5 - By introducing a small lag - we increase the chances of messages being sent together in a batch.
+		- This small delay can increase throughput, compression and efficiency of the producer.
+	- batch.size - maximum number of bytes that will be included in a batch.
+		- Default = 16kb.
+		- Increasing batch size to 32kb or 64 kb can help in increasing the compression, throughput, and efficiency of requests.
+		- Message bigger than batch size will not be batched.
+		- A batch is allocated per partition - so setting very high batch size will waste memory.
+
+6. Keys Hashing & Deafult Partitioner - 
+	
+	- Default - murmur2 algorithm - Can be overridden but should't.
+	- To override - partitioner.class
+	- targetPartition = Utils.abs(Utils.murmur2(record.key())) % numPartitions;
+
+7. Max.black.ms & buffer.memory -
+	
+	- If the producer produces faster than the broker can take, the records will be buffered in memory.
+	- Default - buffer.memory=32Mb.
+	- If that buffer is full (all 32Mb) - then the .send() method will start to block.
+	- max.block.ms = 60000 ( = 1 min) - the time .send() will block until throwing an exception.
+	- Such Exception will usually occuer when - 
+		- the producer has filled up its buffer.
+		- the broker is not accepting any new data.
+		- 60 secs have elapsed.
+			- basically when brokers are down or they can't respond to the requests.

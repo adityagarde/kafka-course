@@ -1,0 +1,62 @@
+Partition Count and Replication Factor Tips
+
+	- They impact performance and durability of the system overall.
+	- If the partitions count increases during a topic lifecycle - the keys ordering may break - thus we need to ensure these parameters are correct in the first place.
+	- If the replication factor increases during a topic life cycle - the pressure on the cluster increases which can decrease the performance.
+
+	1. Partitions Count
+		- Better partitions implies better parallelism and better throughput.
+		- Also it gives ability to run more consumers in a group to scale.
+		- It gives ability to leverage more brokers.
+		BUT - It means there will be more elections to perform for Zookeeper and more files opened on Kafka.
+
+		Guidelines - Partitions per topic
+			- Small Cluster - Less than 6 brokers - 2 * #brokers
+			- Big Cluster - Greater than 12 brokers - 1 * #brokers
+
+	2. Replication Factor
+
+		- Should be atleast 2 - Usually 3 - Maximum 4
+		- Higher the replication factor N - better resilience factor as N-1 brokers can fail.
+										  - But more replication - Higher latencyif acks = all.
+										  - But more disk space will be consumed.
+
+
+Kafka Monitoring 
+	- Kafka Exposes metrics through JMX.
+	- Some important metrics
+		- Under replicated partitions - No. of partitions having problem in In Sync Replicas.
+		- Request Handlers - Utilization of threads for IO, network etc.
+		- Request timing - how long it takes to reply to requests.
+
+Kafka Security
+
+Kafka Multi Cluster + Replication
+	- Mirror Maker
+	- Flink
+	- uReplicator etc.
+
+	- Active => Paasive
+	- Active <=> Active
+
+Multibroker Kafka Cluster using binaries
+
+	- copy and rename server.properties
+	- change broker.id & log directory & listner port
+	- create the data/kafka2 etc directory
+
+	- start zookeeper as usual (zookeeper-server-start config/zookeeper.properties)
+	- start various servers (kafka-server-start config/server.properties)
+
+	- create a topic - kafka-topics --zookeeper 127.0.0.1:2181 --topic my-multi-topic --partitions 6 --replication-factor 3
+
+	- can produce to multiple brokers (broker list) 
+		- kafka-console-producer --broker-list 127.0.0.1:9092,127.0.0.1:9093,127.0.0.1:9094 --topic my-multi-topic
+
+		- producing to only 1 broker - still produces to the entire cluster.
+
+Advertised Host / Listener
+
+Running Kafka on AWS / remote machine 
+	- use the public IP address in "advertised.listeners" in condig/server.properties
+	- and then use this public IP in broker-list in kafka-console-producer

@@ -1,0 +1,35 @@
+KAFKA CONNECT AND STREAMS
+
+1. Kafka Connect
+	Source to Kafka === Producer API === Kafka Connect Source
+	Kafka to Kafka === Consumer / Producer === Kafka Streams
+	Kafka to Sink === Consumer API === Kafka Connect Sink
+
+	- Simplify and improve getting data in and out of Kafka.
+	- We can program ourselves but it is tough to achieve Fault Tolerance, Idempotence, Distribution, Ordering etc.
+
+2. Kafka Streams
+
+	- Easy Data processing and transformation library within Kafka.
+	- No Batching.
+
+3. Schema Registry
+
+	- There is no data verification and with bad data consumer can break.
+
+	Option A - What if Kafka Brokers verified the messages they receive.
+		- Kafka doesnt parse or read the data nor does it load the data in memory - zero copy
+		- Having parsing here means CPU usage increases.
+
+	Option B - 
+		- Schema Registry needs to be a seperate component which the producer and consumer can talk to.
+		- It should be able to reject bad data.
+
+	Confluent Schema Registry
+		- Apache Avro data format.
+		- Store and retrive data for producers and Consumers.
+		- Enforce backward / forward / full compatibility on topics.
+		- Decrease the size of the payload of data sent to Kafka.
+
+		- Producer sends scehma to Schema Registry and sends Avro Content to Kafka.
+		- Consumer gets schema from the Schema Registry and reads Avro content from Kafka.

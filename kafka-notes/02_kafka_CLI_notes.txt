@@ -1,0 +1,114 @@
+In config/zookeeper.properties - dataDir is having a temporary directory, so we change it to a permanent one.
+changed dataDir to /Users/adityagarde/kafka_2.13-2.7.0/data/zookeeper
+
+In config/server.properties - change logsDit to a permanent location.
+log.dirs=/Users/adityagarde/kafka_2.13-2.7.0/data/kafka
+
+1. zookeeper-server-start config/zookeepar.properties
+	This should give INFO binding to port 0.0.0.0/0.0.0.0:2181 on success.
+
+2. kafka-server-start config/server.properties
+	This should give INFO [KafkaServer id=0] started (kafka.server.KafkaServer)
+
+
+CHAPTER 3 KAFKA CLI 101
+
+1. kafka-topics CLI
+
+	kafka-topics --zookeeper 127.0.0.1:2181 --topic first_topic --create
+	=> Error - Missing required argument "[partitions]"
+
+	kafka-topics --zookeeper 127.0.0.1:2181 --topic first_topic --create --partitions 3
+	=> Error - Missing required argument "[replication-factor]"
+
+	kafka-topics --zookeeper 127.0.0.1:2181 --topic first_topic --create --partitions 3 --replication-factor 2
+	=> Error - Error while executing topic command : Replication factor: 2 larger than available brokers: 1.
+		- We cannot create a topic with a replication factor greater than the number of brokers we have.
+
+	kafka-topics --zookeeper 127.0.0.1:2181 --topic first_topic --create --partitions 3 --replication-factor 1
+
+	Listing topics - 
+		kafka-topics --zookeeper 127.0.0.1:2181 --list
+
+	Describing topics -
+		kafka-topics --zookeeper 127.0.0.1:2181 --topic first_topic --describe
+
+	kafka-topics --zookeeper 127.0.0.1:2181 --topic second_topic --create --partitions 6 --replication-factor 1
+
+	Deleting topics -
+		kafka-topics --zookeeper 127.0.0.1:2181 --topic second_topic --delete
+		O/P - Topic second_topic is marked for deletion.
+			  Note: This will have no impact if delete.topic.enable is not set to true.
+
+2. Kafka Console Producer CLI - kafka-console-producer
+
+	kafka-console-producer --broker-list 127.0.0.1:9092 --topic first_topic
+	=> This will give just one ">" prompt and we can send our messages after this.
+
+	kafka-console-producer --broker-list 127.0.0.1:9092 --topic first_topic --producer-property acks=all
+	=> by adding --producer-property we can add newer properties.
+
+	kafka-console-producer --broker-list 127.0.0.1:9092 --topic new_topic
+	=> new_topic was not there earlier, but now it is created with default PartitionCount: 1	ReplicationFactor: 1.
+
+	We can change the default value for number of partitions by editing the num.partitions field under Log Basics in config/server.properties.
+
+3. Kafka Console consumer CLI - kafka-console-consumer
+
+	kafka-console-consumer --bootstrap-server 127.0.0.1:9092 --topic first_topic
+	=> Nothing happens here - because it only reads from the point we start it and will consume newer messages.
+
+	kafka-console-consumer --bootstrap-server 127.0.0.1:9092 --topic first_topic --from_beginning
+	=> Reading all the messages from beginning.
+
+4. Kafka Console Consumers in groups
+
+	kafka-console-consumer --bootstrap-server 127.0.0.1:9092 --topic first_topic --group my-first-group
+	=> If we open more than one instance of this consumer - we can see that the messages coming from the producer are slipt between them because they belong to the same group.
+
+	kafka-console-consumer --bootstrap-server 127.0.0.1:9092 --topic first_topic --group my-second-group --from-beginning
+	=> This shows all the messages from starting as it is a new group and after this command the offset is set to the last message.
+	=> If we repeat the message then we will not get the messages from starting.
+
+5. Kafka Consumer Groups CLI- kafka-console-groups
+
+	kafka-consumer-groups --bootstrap-server 127.0.0.1:9092 --list
+	=> Lists the consumer groups
+
+	kafka-consumer-groups --bootstrap-server localhost:9092 --describe --group my-second-group
+	=> Describes the details. We can check the LAG field which is difference of current offset and log end offset.
+
+6. Resetting Offsets
+	
+	--reset-offsets => Reset offsets of consumer group. Supports one consumer group at the time, and instances should be inactive.
+	Has 2 execution options: --dry-run (the default) to plan which offsets to reset, and --execute to update the offsets.
+
+	You must choose one of the following reset specifications: --to-datetime, --by-period, --to-earliest, --to-latest, --shift-by, --from-file, --to-current.
+
+	kafka-consumer-groups --bootstrap-server localhost:9092 --group my-first-group --reset-offsets --to-earliest
+	=> WARN: No action will be performed as the --execute option is missing.
+
+	kafka-consumer-groups --bootstrap-server localhost:9092 --group my-first-group --reset-offsets --to-earliest --execute
+	=> Error - One of the reset scopes should be defined: --all-topics, --topic.
+
+	kafka-consumer-groups --bootstrap-server localhost:9092 --group my-first-group --reset-offsets --to-earliest --execute --topic first_topic
+	=> This successfully executes resulting in '0' as new offset for all the paritions of the topic we used.
+
+	kafka-consumer-groups --bootstrap-server localhost:9092 --describe --group my-first-group
+	=> When this command is executed now, we can see that offset has ben set to 0.
+
+	kafka-consumer-groups --bootstrap-server localhost:9092 --group my-first-group --reset-offsets --shift-by 2 --execute --topic first_topic
+	=> --shift-by 2 -> Will shift it 2 forward
+	=> --shift-by -2 -> Will shift it 2 backward
+
+
+
+
+the wakeup() method is used to interupt consumer.poll()
+It will throw WakeUpException
+latch.countDown(); - to tell the main code that we are done with the consumer.
+
+Assign and Seek are mostlyused to replay data or fetch specific message.
+
+kafka-topics --zookeeper 127.0.0.1:2181 --create --topic twitter_tweets --partitions 6 --replication-factor 1
+kafka-console-consumer --bootstrap-server 127.0.0.1:9092 --topic twitter_tweets
